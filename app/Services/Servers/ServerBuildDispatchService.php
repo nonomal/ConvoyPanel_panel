@@ -15,6 +15,7 @@ use Convoy\Jobs\Server\UpdatePasswordJob;
 use Convoy\Jobs\Server\SendPowerCommandJob;
 use Convoy\Jobs\Server\WaitUntilVmIsCreatedJob;
 use Convoy\Jobs\Server\WaitUntilVmIsDeletedJob;
+use Convoy\Jobs\Server\SyncWindowsSettings;
 use Convoy\Data\Server\Deployments\ServerDeploymentData;
 
 class ServerBuildDispatchService
@@ -67,11 +68,20 @@ class ServerBuildDispatchService
             ];
         }
 
-        if (! empty($deployment->account_password)) {
+        $startOnce = false;
+        
+        // TODO: Readd the start_on_completion check
+
+        if (!empty($deployment->account_password)) {
             $jobs[] = new UpdatePasswordJob($deployment->server->id, $deployment->account_password);
+            if (str_contains($deployment->template->name, "Windows")) {
+                $jobs[] = new SendPowerCommandJob($deployment->server->id, PowerAction::START);
+                $startOnce = true;
+                $jobs[] = new SyncWindowsSettings($deployment->server->id, $deployment->account_password);
+            }
         }
 
-        if ($deployment->start_on_completion) {
+        if (!$startOnce) {
             $jobs[] = new SendPowerCommandJob($deployment->server->id, PowerAction::START);
         }
 
