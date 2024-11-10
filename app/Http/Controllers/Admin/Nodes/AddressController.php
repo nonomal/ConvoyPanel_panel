@@ -25,7 +25,7 @@ class AddressController extends Controller
                                          new FiltersAddressWildcard(),
                                      ), AllowedFilter::exact('server_id')->nullable()],
                                  )
-                                 ->paginate(min($request->query('per_page', 50), 100))->appends(
+                                 ->paginate(min($request->query('per_page', 50), 999999))->appends(
                 $request->query(),
             );
 
