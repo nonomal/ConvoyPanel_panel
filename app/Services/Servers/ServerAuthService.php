@@ -16,12 +16,15 @@ class ServerAuthService
     {
         try {
             $OsInfo = $this->guestAgentRepository->setServer($server)->guestAgentOs();
-            if (str_contains($OsInfo["result"]["name"], "Windows")) {
-                $username = "Administrator";
-            } else {
-                $username = "root";
+            if (is_array($OsInfo) && isset($OsInfo["result"]["name"])) {
+                if (str_contains($OsInfo["result"]["name"], "Windows")) {
+                    $username = "Administrator";
+                } else {
+                    $username = "root";
+                }
+                
+                $this->guestAgentRepository->setServer($server)->updateGuestAgentPassword($username, $password);
             }
-            $this->guestAgentRepository->setServer($server)->updateGuestAgentPassword($username, $password);
             $this->configRepository->setServer($server)->update(['cipassword' => $password]);
         } catch (\Exception $e) {
             $this->configRepository->setServer($server)->update(['cipassword' => $password]);
