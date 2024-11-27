@@ -24,10 +24,15 @@ export const routes: Route[] = [
             {
                 path: ':id',
                 element: lazyLoad(lazy(() => import('./AdminUserRouter'))),
-                loader: ({ params }) =>
-                    query(getKey(parseInt(params.id!)), () =>
-                        getUser(parseInt(params.id!))
-                    ),
+                loader: async ({ params }) => {
+                    try {
+                        const id = parseInt(params.id!);
+                        const user = await query(getKey(id), () => getUser(id));
+                        return user;
+                    } catch (error) {
+                        return null;
+                    }
+                },
                 children: [
                     {
                         path: 'settings',
