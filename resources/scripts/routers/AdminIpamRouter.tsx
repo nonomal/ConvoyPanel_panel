@@ -31,10 +31,15 @@ export const routes: Route[] = [
             },
             {
                 path: ':poolId',
-                loader: ({ params }) =>
-                    query(getPoolKey(parseInt(params.poolId!)), () =>
-                        getAddressPool(parseInt(params.poolId!))
-                    ),
+                loader: async ({ params }) => {
+                    try {
+                        const poolId = parseInt(params.poolId!);
+                        const pool = await query(getPoolKey(poolId), () => getAddressPool(poolId));
+                        return pool;
+                    } catch (error) {
+                        return null;
+                    }
+                },
                 element: lazyLoad(lazy(() => import('./AdminIpamRouter'))),
                 handle: {
                     crumb: data => ({
