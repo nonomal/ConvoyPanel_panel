@@ -5,6 +5,7 @@ namespace Convoy\Services\Servers;
 use Convoy\Models\Server;
 use Convoy\Repositories\Proxmox\Server\ProxmoxConfigRepository;
 use Convoy\Repositories\Proxmox\Server\ProxmoxGuestAgentRepository;
+use Illuminate\Support\Str;
 
 class ServerAuthService
 {
@@ -12,39 +13,38 @@ class ServerAuthService
     {
     }
 
-    public function updatePassword(Server $server, string $password)
+    public function updatePassword(Server $server, string $password): void
     {
+        // Always store CIPassword first
+        $this->configRepository->setServer($server)->update(['cipassword' => $password]);
+
         try {
-            $OsInfo = $this->guestAgentRepository->setServer($server)->guestAgentOs();
-            if (is_array($OsInfo) && isset($OsInfo["result"]["name"])) {
-                if (str_contains($OsInfo["result"]["name"], "Windows")) {
-                    $username = "Administrator";
-                } else {
-                    $username = "root";
-                }
-                
-                $this->guestAgentRepository->setServer($server)->updateGuestAgentPassword($username, $password);
+            $osInfo = $this->guestAgentRepository->setServer($server)->guestAgentOs();
+
+            // If we have valid OS info, decide which username to use
+            if (is_array($osInfo) && isset($osInfo['result']['name'])) {
+                $osName = $osInfo['result']['name'];
+                $username = Str::contains(Str::lower($osName), 'windows') ? 'Administrator' : 'root';
+
+                $this->guestAgentRepository
+                    ->setServer($server)
+                    ->updateGuestAgentPassword($username, $password);
             }
-            $this->configRepository->setServer($server)->update(['cipassword' => $password]);
         } catch (\Exception $e) {
-            $this->configRepository->setServer($server)->update(['cipassword' => $password]);
+            // Optionally log or handle exceptions
         }
     }
 
-    public function updateWindowsPassword(Server $server, string $password) {
-        $this->guestAgentRepository->setServer($server)->updateGuestAgentPassword("Administrator", $password);
-    }
-
-    public function getSSHKeys(Server $server)
+    public function getSSHKeys(Server $server): string
     {
         $raw = collect($this->configRepository->setServer($server)->getConfig())->where('key', '=', 'sshkeys')->first()['value'] ?? '';
 
         return rawurldecode($raw);
     }
 
-    public function updateSSHKeys(Server $server, ?string $keys)
+    public function updateSSHKeys(Server $server, ?string $keys): void
     {
-        if (!empty($keys)) {
+        if (! empty($keys)) {
             $this->configRepository->setServer($server)->update(['sshkeys' => rawurlencode($keys)]);
         } else {
             $this->configRepository->setServer($server)->update(['delete' => 'sshkeys']);

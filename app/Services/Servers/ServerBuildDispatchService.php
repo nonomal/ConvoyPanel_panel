@@ -2,21 +2,21 @@
 
 namespace Convoy\Services\Servers;
 
-use Convoy\Models\Server;
+use Convoy\Data\Server\Deployments\ServerDeploymentData;
+use Convoy\Enums\Server\PowerAction;
 use Convoy\Enums\Server\State;
 use Convoy\Enums\Server\Status;
-use Illuminate\Support\Facades\Bus;
-use Convoy\Enums\Server\PowerAction;
-use Convoy\Jobs\Server\SyncBuildJob;
 use Convoy\Jobs\Server\BuildServerJob;
 use Convoy\Jobs\Server\DeleteServerJob;
 use Convoy\Jobs\Server\MonitorStateJob;
-use Convoy\Jobs\Server\UpdatePasswordJob;
 use Convoy\Jobs\Server\SendPowerCommandJob;
+use Convoy\Jobs\Server\SyncBuildJob;
+use Convoy\Jobs\Server\UpdatePasswordJob;
 use Convoy\Jobs\Server\WaitUntilVmIsCreatedJob;
 use Convoy\Jobs\Server\WaitUntilVmIsDeletedJob;
-use Convoy\Jobs\Server\SyncWindowsSettings;
-use Convoy\Data\Server\Deployments\ServerDeploymentData;
+use Convoy\Models\Server;
+use Illuminate\Support\Facades\Bus;
+use Illuminate\Support\Str;
 
 class ServerBuildDispatchService
 {
@@ -56,35 +56,39 @@ class ServerBuildDispatchService
 
     private function getChainedBuildJobs(ServerDeploymentData $deployment): array
     {
-        if ($deployment->should_create_server) {
-            $jobs = [
+        // Base jobs: either create a new server or sync an existing one
+        $jobs = $deployment->should_create_server
+            ? [
                 new BuildServerJob($deployment->server->id, $deployment->template->id),
                 new WaitUntilVmIsCreatedJob($deployment->server->id),
                 new SyncBuildJob($deployment->server->id),
-            ];
-        } else {
-            $jobs = [
+            ]
+            : [
                 new SyncBuildJob($deployment->server->id),
             ];
-        }
 
-        $startOnce = false;
-        
-        // TODO: Readd the start_on_completion check
+        if (Str::contains(Str::lower($deployment->template->name), 'windows')) {
+            $jobs = [
+                ...$jobs,
+                new SendPowerCommandJob($deployment->server->id, PowerAction::START),
+                new MonitorStateJob($deployment->server->id, State::RUNNING),
+            ];
 
-        if (!empty($deployment->account_password)) {
-            $jobs[] = new UpdatePasswordJob($deployment->server->id, $deployment->account_password);
-            if (str_contains($deployment->template->name, "Windows")) {
+            if (! empty($deployment->account_password)) {
+                $jobs[] = new UpdatePasswordJob($deployment->server->id, $deployment->account_password);
+            }
+        } else {
+            // For non-Windows, update password first if provided
+            if (! empty($deployment->account_password)) {
+                $jobs[] = new UpdatePasswordJob($deployment->server->id, $deployment->account_password);
+            }
+            // Then power on if user wants to start on completion
+            if ($deployment->start_on_completion) {
                 $jobs[] = new SendPowerCommandJob($deployment->server->id, PowerAction::START);
-                $startOnce = true;
-                $jobs[] = new SyncWindowsSettings($deployment->server->id, $deployment->account_password);
             }
         }
 
-        if (!$startOnce) {
-            $jobs[] = new SendPowerCommandJob($deployment->server->id, PowerAction::START);
-        }
-
+        // Final callback to clear the status
         $jobs[] = function () use ($deployment) {
             Server::findOrFail($deployment->server->id)->update(['status' => null]);
         };
