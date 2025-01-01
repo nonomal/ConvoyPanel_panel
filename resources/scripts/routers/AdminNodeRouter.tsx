@@ -25,10 +25,15 @@ export const routes: Route[] = [
             },
             {
                 path: ':nodeId',
-                loader: ({ params }) =>
-                    query(getPoolKey(parseInt(params.nodeId!)), () =>
-                        getNode(parseInt(params.nodeId!))
-                    ),
+                loader: async ({ params }) => {
+                    try {
+                        const nodeId = parseInt(params.nodeId!);
+                        const node = await query(getPoolKey(nodeId), () => getNode(nodeId));
+                        return node;
+                    } catch (error) {
+                        return null;
+                    }
+                },
                 element: lazyLoad(
                     lazy(() => import('@/routers/AdminNodeRouter'))
                 ),

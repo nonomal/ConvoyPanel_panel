@@ -31,10 +31,15 @@ export const routes: Route[] = [
             },
             {
                 path: ':poolId',
-                loader: ({ params }) =>
-                    query(getPoolKey(parseInt(params.poolId!)), () =>
-                        getAddressPool(parseInt(params.poolId!))
-                    ),
+                loader: async ({ params }) => {
+                    try {
+                        const poolId = parseInt(params.poolId!);
+                        const pool = await query(getPoolKey(poolId), () => getAddressPool(poolId));
+                        return pool;
+                    } catch (error) {
+                        return null;
+                    }
+                },
                 element: lazyLoad(lazy(() => import('./AdminIpamRouter'))),
                 handle: {
                     crumb: data => ({
@@ -49,17 +54,21 @@ export const routes: Route[] = [
                     },
                     {
                         path: 'addresses',
-                        loader: ({ params }) => {
-                            const id = parseInt(params.poolId!)
-                            const page = params.page ? parseInt(params.page) : 1
-
-                            return query(getAddressesKey(id, page, ''), () =>
-                                getAddresses(id, {
-                                    page,
-                                    query: '',
-                                    include: ['server'],
-                                })
-                            )
+                        loader: async ({ params }) => {
+                            try {
+                                const id = parseInt(params.poolId!)
+                                const page = params.page ? parseInt(params.page) : 1
+                                const addresses = await query(getAddressesKey(id, page, ''), () =>
+                                    getAddresses(id, {
+                                        page,
+                                        query: '',
+                                        include: ['server'],
+                                    })
+                                )
+                                return addresses
+                            } catch (error) {
+                                return null
+                            }
                         },
                         element: lazyLoad(
                             lazy(
