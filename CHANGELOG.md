@@ -4,6 +4,21 @@ This file is a running track of new features and fixes to each version of the pa
 
 This project follows [Semantic Versioning](http://semver.org) guidelines.
 
+## v4.3.0-rc.1
+
+> [!IMPORTANT]  
+> The source between v4 and v10 will begin to diverge starting here. Once v10 is complete, v4's commit history will be
+> abandoned. We will not be introducing any changes to the database structure in v4 to prevent any conflicts with v10's
+> database structure.
+
+### Changes
+
+- Added guest agent support for changing Windows user passwords #120
+- Servers will now automatically start after unsuspension #119
+- Fixed parsing of user realm types #126
+- Fixed broken redirect when unauthenticated while accessing certain admin routes #123
+- Fixed fetching of nameservers when there are none present #125
+
 ## v4.2.4
 
 ### Changes
